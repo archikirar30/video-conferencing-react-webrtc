@@ -13,6 +13,12 @@ export function createPeerConnection({
       urls: "turn:openrelay.metered.ca:80",
       username: "openrelayproject",
       credential: "openrelayproject"
+    },
+    // TURN TLS (MOST RELIABLE)
+    {
+      urls: "turns:openrelay.metered.ca:443",
+      username: "openrelayproject",
+      credential: "openrelayproject"
     }
     ]
   });
@@ -30,6 +36,7 @@ export function createPeerConnection({
 
   // ICE candidates
   pc.onicecandidate = (event) => {
+    console.log("ICE:", event.candidate.candidate);
     if (event.candidate) {
       socket.emit("ice-candidate", {
         roomId,
