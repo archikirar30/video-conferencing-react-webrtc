@@ -49,7 +49,13 @@ export function useSocketRoom({
     });
 
     socket.on("ice-candidate", async (candidate) => {
-      await pcRef.current.addIceCandidate(candidate);
+      if (!candidate) return; // 👈 REQUIRED
+
+      try {
+        await pcRef.current.addIceCandidate(candidate);
+      } catch (err) {
+        console.warn("ICE add failed", err);
+      }
     });
 
     socket.on("user-left", () => {

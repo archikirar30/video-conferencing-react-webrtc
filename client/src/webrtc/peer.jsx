@@ -1,49 +1,54 @@
 // src/webrtc/peer.js
 
 export function createPeerConnection({
-  localStream,
-  remoteVideoRef,
-  socket,
-  roomId
+    localStream,
+    remoteVideoRef,
+    socket,
+    roomId
 }) {
-  const pc = new RTCPeerConnection({
-    iceServers: [
-      { urls: "stun:stun.l.google.com:19302" },
-      {
-      urls: "turn:openrelay.metered.ca:80",
-      username: "openrelayproject",
-      credential: "openrelayproject"
-    },
-    // TURN TLS (MOST RELIABLE)
-    {
-      urls: "turns:openrelay.metered.ca:443",
-      username: "openrelayproject",
-      credential: "openrelayproject"
-    }
-    ]
-  });
+    const pc = new RTCPeerConnection({
+        iceServers: [
+            { urls: "stun:stun.l.google.com:19302" },
+            {
+                urls: "turn:openrelay.metered.ca:80",
+                username: "openrelayproject",
+                credential: "openrelayproject"
+            },
+            // TURN TLS (MOST RELIABLE)
+            {
+                urls: "turns:openrelay.metered.ca:443",
+                username: "openrelayproject",
+                credential: "openrelayproject"
+            }
+        ]
+    });
 
-  // Add local tracks
-  localStream.getTracks().forEach(track => {
-    pc.addTrack(track, localStream);
-  });
+    // Add local tracks
+    localStream.getTracks().forEach(track => {
+        pc.addTrack(track, localStream);
+    });
 
-  // Remote stream
-  pc.ontrack = (event) => {
-    console.log("📺 Remote track received");
-    remoteVideoRef.current.srcObject = event.streams[0];
-  };
+    // Remote stream
+    pc.ontrack = (event) => {
+        console.log("📺 Remote track received");
+        remoteVideoRef.current.srcObject = event.streams[0];
+    };
 
-  // ICE candidates
-  pc.onicecandidate = (event) => {
-    console.log("ICE:", event.candidate.candidate);
-    if (event.candidate) {
-      socket.emit("ice-candidate", {
-        roomId,
-        candidate: event.candidate
-      });
-    }
-  };
+    // ICE candidates
+    pc.onicecandidate = (event) => {
+        if (!event.candidate) {
+            // ICE gathering finished — ignore
+            return;
+        }
 
-  return pc;
+        console.log("ICE:", event.candidate.candidate);
+        if (event.candidate) {
+            socket.emit("ice-candidate", {
+                roomId,
+                candidate: event.candidate
+            });
+        }
+    };
+
+    return pc;
 }
