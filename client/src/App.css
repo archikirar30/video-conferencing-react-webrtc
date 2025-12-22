@@ -1,0 +1,117 @@
+* {
+  box-sizing: border-box;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont;
+}
+
+body {
+  margin: 0;
+  background: #0f172a;
+  color: white;
+}
+
+.app {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Join screen */
+.join-container {
+  margin: auto;
+  background: #020617;
+  padding: 30px;
+  border-radius: 12px;
+  width: 320px;
+  text-align: center;
+}
+
+.join-container input {
+  width: 100%;
+  padding: 10px;
+  margin: 12px 0;
+  border-radius: 6px;
+  border: none;
+}
+
+.primary {
+  width: 100%;
+  padding: 10px;
+  background: #2563eb;
+  border: none;
+  border-radius: 6px;
+  color: white;
+  cursor: pointer;
+}
+
+/* Header */
+.header {
+  padding: 12px 20px;
+  background: #020617;
+  border-bottom: 1px solid #1e293b;
+}
+
+/* Video layout */
+.video-container {
+  width: 100%;
+  height: 100%;
+  flex: 1;
+  display: grid;
+  place-items: center;
+  background: black;
+  overflow: hidden;
+}
+
+.remote-video {
+  -webkit-transform: scaleX(-1); /* For compatibility */
+  transform: scaleX(-1);
+  min-height: 100%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  border-radius: 24px;
+  background: black;
+}
+
+.local-video {
+  position: absolute;
+  bottom: 90px;
+  right: 20px;
+  width: 180px;
+  height: 120px;
+  border-radius: 10px;
+  object-fit: cover;
+  border: 2px solid white;
+  background: black;
+  -webkit-transform: scaleX(-1); /* For compatibility */
+  transform: scaleX(-1);
+}
+
+/* Controls */
+.controls {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  padding: 16px;
+  background: #020617;
+}
+
+.controls button {
+  padding: 10px 16px;
+  border-radius: 20px;
+  border: none;
+  background: #1e293b;
+  color: white;
+  cursor: pointer;
+}
+
+.controls button:hover {
+  background: #334155;
+}
+
+.danger {
+  background: #dc2626 !important;
+}
+
+button svg {
+  font-size: 24px;
+}

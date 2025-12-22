@@ -1,149 +1,59 @@
 import { useEffect, useRef, useState } from "react";
 import { socket } from "./services/socket";
-import { createPeerConnection } from "./webrtc/peer";
+import { useMediaStream } from "./hooks/useMediaStream";
+import { usePeerConnection } from "./hooks/usePeerConnection";
+import { useSocketRoom } from "./hooks/useSocketRoom";
+
+import { BsCameraVideoOffFill,BsCameraVideoFill,BsFillMicMuteFill,BsFillMicFill } from "react-icons/bs";
+import { MdCallEnd } from "react-icons/md";
+import "./App.css"
 
 function App() {
-  const localVideoRef = useRef(null);
-  const remoteVideoRef = useRef(null);
-  const localStreamRef = useRef(null);
-  const peerConnectionRef = useRef(null);
-
+  // UI + room state
   const [roomId, setRoomId] = useState("");
   const [joined, setJoined] = useState(false);
-  const [isMuted, setIsMuted] = useState(false);
-  const [isCameraOff, setIsCameraOff] = useState(false);
 
+  // Video refs
+  const localVideoRef = useRef(null);
+  const remoteVideoRef = useRef(null);
 
-  // Step 1: Get camera
-  useEffect(() => {
-    if (!joined) return;
+  // Media hook
+  const {
+    streamRef,
+    startMedia,
+    stopMedia,
+    toggleMute,
+    toggleCamera,
+    isMuted,
+    isCameraOff
+  } = useMediaStream();
 
-    async function initMedia() {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: true,
-        audio: true
-      });
+  // Peer hook
+  const { pcRef, createPC, closePC } = usePeerConnection();
 
-      localStreamRef.current = stream;
-      localVideoRef.current.srcObject = stream;
+  // Socket signaling hook
+  useSocketRoom({
+    socket,
+    roomId,
+    joined,
+    streamRef,
+    remoteVideoRef,
+    createPC,
+    pcRef
+  });
 
-      socket.emit("join-room", roomId);
-    }
-
-    initMedia();
-  }, [joined]);
-
-  // Step 2: Socket events
-  useEffect(() => {
-    if (!joined) return;
-
-    socket.on("user-joined", async () => {
-      console.log("👤 User joined");
-
-      peerConnectionRef.current = createPeerConnection({
-        localStream: localStreamRef.current,
-        remoteVideoRef,
-        socket,
-        roomId
-      });
-
-      const offer = await peerConnectionRef.current.createOffer();
-      await peerConnectionRef.current.setLocalDescription(offer);
-
-      socket.emit("offer", { roomId, offer });
-    });
-
-    socket.on("offer", async (offer) => {
-      console.log("📨 Offer received");
-
-      peerConnectionRef.current = createPeerConnection({
-        localStream: localStreamRef.current,
-        remoteVideoRef,
-        socket,
-        roomId
-      });
-
-      await peerConnectionRef.current.setRemoteDescription(
-        new RTCSessionDescription(offer)
-      );
-
-      const answer = await peerConnectionRef.current.createAnswer();
-      await peerConnectionRef.current.setLocalDescription(answer);
-
-      socket.emit("answer", { roomId, answer });
-    });
-
-    socket.on("answer", async (answer) => {
-      console.log("📨 Answer received");
-
-      await peerConnectionRef.current.setRemoteDescription(
-        new RTCSessionDescription(answer)
-      );
-    });
-
-    socket.on("ice-candidate", async (candidate) => {
-      console.log("❄ ICE candidate");
-
-      await peerConnectionRef.current.addIceCandidate(
-        new RTCIceCandidate(candidate)
-      );
-    });
-
-    socket.on("user-left", () => {
-      console.log("👋 Remote user left");
-
-      if (remoteVideoRef.current) {
-        remoteVideoRef.current.srcObject = null;
-      }
-
-      if (peerConnectionRef.current) {
-        peerConnectionRef.current.close();
-        peerConnectionRef.current = null;
-      }
-    });
-
-
-    return () => socket.removeAllListeners();
-  }, [joined]);
-
-  const toggleMute = () => {
-    if (!localStreamRef.current) return;
-
-    localStreamRef.current.getAudioTracks().forEach(track => {
-      track.enabled = !track.enabled;
-    });
-
-    setIsMuted(prev => !prev);
+  // Join room
+  const joinCall = async () => {
+    if (!roomId) return alert("Enter room ID");
+    await startMedia();
+    setJoined(true);
   };
 
-  const toggleCamera = () => {
-    if (!localStreamRef.current) return;
-
-    localStreamRef.current.getVideoTracks().forEach(track => {
-      track.enabled = !track.enabled;
-    });
-
-    setIsCameraOff(prev => !prev);
-  };
-
+  // Leave call
   const leaveCall = () => {
-    console.log("🚪 Leaving call");
+    stopMedia();
+    closePC();
 
-    // 1. Stop local media
-    if (localStreamRef.current) {
-      localStreamRef.current.getTracks().forEach(track => track.stop());
-      localStreamRef.current = null;
-    }
-
-    // 2. Close PeerConnection
-    if (peerConnectionRef.current) {
-      peerConnectionRef.current.ontrack = null;
-      peerConnectionRef.current.onicecandidate = null;
-      peerConnectionRef.current.close();
-      peerConnectionRef.current = null;
-    }
-
-    // 3. Clear video elements
     if (localVideoRef.current) {
       localVideoRef.current.srcObject = null;
     }
@@ -152,55 +62,73 @@ function App() {
       remoteVideoRef.current.srcObject = null;
     }
 
-    // 4. Inform server
     socket.emit("leave-room", roomId);
-
-    // 5. Reset UI state
     setJoined(false);
-    setIsMuted(false);
-    setIsCameraOff(false);
   };
 
+  // Attach local stream AFTER video renders
+  useEffect(() => {
+    if (!joined) return;
+    if (!localVideoRef.current) return;
+    if (!streamRef.current) return;
 
-
+    localVideoRef.current.srcObject = streamRef.current;
+  }, [joined]);
 
   return (
-    <div>
+    <div className="app">
       {!joined && (
-        <>
+        <div className="join-container">
+          <h2>Join Video Room</h2>
           <input
-            placeholder="Room ID"
+            placeholder="Enter Room ID"
             value={roomId}
             onChange={(e) => setRoomId(e.target.value)}
           />
-          <button onClick={() => setJoined(true)}>Join</button>
-        </>
+          <button className="primary" onClick={joinCall}>
+            Join
+          </button>
+        </div>
       )}
 
       {joined && (
         <>
-          <video ref={localVideoRef} autoPlay muted playsInline />
-          <video ref={remoteVideoRef} autoPlay playsInline />
-          <div style={{ marginTop: 10 }}>
+          <header className="header">
+            <span>Room: {roomId}</span>
+          </header>
+
+          <div className="video-container">
+            <video
+              ref={remoteVideoRef}
+              autoPlay
+              playsInline
+              className="remote-video"
+            />
+
+            <video
+              ref={localVideoRef}
+              autoPlay
+              muted
+              playsInline
+              className="local-video"
+            />
+          </div>
+
+          <div className="controls">
             <button onClick={toggleMute}>
-              {isMuted ? "Unmute 🎤" : "Mute 🔇"}
+              {isMuted ? <BsFillMicMuteFill /> : <BsFillMicFill/> }
             </button>
 
             <button onClick={toggleCamera}>
-              {isCameraOff ? "Camera ON 📷" : "Camera OFF 🚫"}
-            </button>
-            <button
-              onClick={leaveCall}
-              style={{ background: "red", color: "white", marginLeft: 10 }}
-            >
-              Leave Call ❌
+              {isCameraOff ? <BsCameraVideoOffFill  /> : <BsCameraVideoFill />}
             </button>
 
+            <button className="danger" onClick={leaveCall}>
+              <MdCallEnd />
+            </button>
           </div>
-
         </>
       )}
-
     </div>
   );
 }
