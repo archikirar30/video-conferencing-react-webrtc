@@ -3,69 +3,80 @@ import { useEffect } from "react";
 export function useSocketRoom({
   socket,
   roomId,
+  username,
   joined,
   streamRef,
   remoteVideoRef,
   createPC,
-  pcRef
+  pcRef,
+  setRemoteUserName
 }) {
   useEffect(() => {
-    if (!joined) return;
+  if (!joined) return;
 
-    socket.emit("join-room", roomId);
+  socket.emit("join-room", { roomId, username });
 
-    socket.on("user-joined", async () => {
-      const pc = createPC({
-        localStream: streamRef.current,
-        remoteVideoRef,
-        socket,
-        roomId
-      });
+  // 🟢 Existing user
+  socket.on("user-joined", async ({ username }) => {
+    setRemoteUserName(prev => prev ?? username);
 
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
-
-      socket.emit("offer", { roomId, offer });
+    const pc = createPC({
+      localStream: streamRef.current,
+      remoteVideoRef,
+      socket,
+      roomId
     });
 
-    socket.on("offer", async (offer) => {
-      const pc = createPC({
-        localStream: streamRef.current,
-        remoteVideoRef,
-        socket,
-        roomId
-      });
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
 
-      await pc.setRemoteDescription(offer);
+    socket.emit("offer", { roomId, offer, username });
+  });
 
-      const answer = await pc.createAnswer();
-      await pc.setLocalDescription(answer);
+  // 🟢 New user
+  socket.on("offer", async ({ offer, username}) => {
+    setRemoteUserName(prev => prev ?? username);
 
-      socket.emit("answer", { roomId, answer });
+    const pc = createPC({
+      localStream: streamRef.current,
+      remoteVideoRef,
+      socket,
+      roomId
     });
 
-    socket.on("answer", async (answer) => {
-      await pcRef.current.setRemoteDescription(answer);
-    });
+    await pc.setRemoteDescription(offer);
 
-    socket.on("ice-candidate", async (candidate) => {
-      if (!candidate) return; // 👈 REQUIRED
+    const answer = await pc.createAnswer();
+    await pc.setLocalDescription(answer);
 
-      try {
-        await pcRef.current.addIceCandidate(candidate);
-      } catch (err) {
-        console.warn("ICE add failed", err);
-      }
-    });
+    socket.emit("answer", { roomId, answer, username });
+  });
 
-    socket.on("user-left", () => {
-      if (remoteVideoRef.current) {
-        remoteVideoRef.current.srcObject = null;
-      }
-      pcRef.current?.close();
+  socket.on("answer", async ({ answer }) => {
+    await pcRef.current.setRemoteDescription(answer);
+  });
+
+  socket.on("ice-candidate", async (candidate) => {
+    if (!candidate) return;
+    await pcRef.current.addIceCandidate(candidate);
+  });
+
+  socket.on("user-left", () => {
+    setRemoteUserName(null);
+
+    if (remoteVideoRef.current) {
+      remoteVideoRef.current.srcObject = null;
+    }
+
+    if (pcRef.current) {
+      pcRef.current.close();
       pcRef.current = null;
-    });
+    }
+  });
 
-    return () => socket.removeAllListeners();
-  }, [joined]);
+  return () => {
+    socket.removeAllListeners();
+  };
+}, [joined]);
+
 }

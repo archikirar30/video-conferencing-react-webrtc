@@ -4,7 +4,7 @@ import { useMediaStream } from "./hooks/useMediaStream";
 import { usePeerConnection } from "./hooks/usePeerConnection";
 import { useSocketRoom } from "./hooks/useSocketRoom";
 
-import { BsCameraVideoOffFill,BsCameraVideoFill,BsFillMicMuteFill,BsFillMicFill } from "react-icons/bs";
+import { BsCameraVideoOffFill, BsCameraVideoFill, BsFillMicMuteFill, BsFillMicFill } from "react-icons/bs";
 import { MdCallEnd } from "react-icons/md";
 import "./App.css"
 
@@ -12,6 +12,8 @@ function App() {
   // UI + room state
   const [roomId, setRoomId] = useState("");
   const [joined, setJoined] = useState(false);
+  const [username, setUserName] = useState("");
+  const [remoteUserName, setRemoteUserName] = useState(null)
 
   // Video refs
   const localVideoRef = useRef(null);
@@ -35,11 +37,13 @@ function App() {
   useSocketRoom({
     socket,
     roomId,
+    username,
     joined,
     streamRef,
     remoteVideoRef,
     createPC,
-    pcRef
+    pcRef,
+    setRemoteUserName,
   });
 
   // Join room
@@ -51,20 +55,22 @@ function App() {
 
   // Leave call
   const leaveCall = () => {
+    socket.emit("leave-room", { roomId });
+
     stopMedia();
     closePC();
 
     if (localVideoRef.current) {
       localVideoRef.current.srcObject = null;
     }
-
     if (remoteVideoRef.current) {
       remoteVideoRef.current.srcObject = null;
     }
 
-    socket.emit("leave-room", roomId);
+    setRemoteUserName(null); // 👈 THIS FIXES STUCK NAME
     setJoined(false);
   };
+
 
   // Attach local stream AFTER video renders
   useEffect(() => {
@@ -85,6 +91,11 @@ function App() {
             value={roomId}
             onChange={(e) => setRoomId(e.target.value)}
           />
+          <input
+            placeholder="Enter UserName"
+            value={username}
+            onChange={(e) => setUserName(e.target.value)}
+          />
           <button className="primary" onClick={joinCall}>
             Join
           </button>
@@ -98,29 +109,38 @@ function App() {
           </header>
 
           <div className="video-container">
-            <video
-              ref={remoteVideoRef}
-              autoPlay
-              playsInline
-              className="remote-video"
-            />
+            {/* Remote */}
+            <div className="video-tile remote-tile">
+              <video
+                ref={remoteVideoRef}
+                autoPlay
+                playsInline
+                className="video"
+              />
+              {remoteUserName && (
+                <div className="name-tag">{remoteUserName}</div>
+              )}
+            </div>
 
-            <video
-              ref={localVideoRef}
-              autoPlay
-              muted
-              playsInline
-              className="local-video"
-            />
+            {/* Local */}
+            <div className="video-tile local-tile">
+              <video
+                ref={localVideoRef}
+                autoPlay
+                muted
+                playsInline
+                className="video"
+              />
+              <div className="name-tag you">{username} (You)</div>
+            </div>
           </div>
-
           <div className="controls">
             <button onClick={toggleMute}>
-              {isMuted ? <BsFillMicMuteFill /> : <BsFillMicFill/> }
+              {isMuted ? <BsFillMicMuteFill /> : <BsFillMicFill />}
             </button>
 
             <button onClick={toggleCamera}>
-              {isCameraOff ? <BsCameraVideoOffFill  /> : <BsCameraVideoFill />}
+              {isCameraOff ? <BsCameraVideoOffFill /> : <BsCameraVideoFill />}
             </button>
 
             <button className="danger" onClick={leaveCall}>
