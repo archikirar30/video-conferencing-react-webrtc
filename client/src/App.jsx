@@ -14,8 +14,6 @@ function App() {
   const [joined, setJoined] = useState(false);
   const [username, setUserName] = useState("");
   const [remoteUserName, setRemoteUserName] = useState(null)
-  const [participants, setParticipants] = useState([]);
-
 
   // Video refs
   const localVideoRef = useRef(null);
@@ -46,7 +44,6 @@ function App() {
     createPC,
     pcRef,
     setRemoteUserName,
-    setParticipants
   });
 
   // Join room
