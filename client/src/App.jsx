@@ -14,6 +14,7 @@ function App() {
   const [joined, setJoined] = useState(false);
   const [username, setUserName] = useState("");
   const [participants, setParticipants] = useState([]);
+  const [remoteMuted, setRemoteMuted] = useState(false)
 
 
   // Video refs
@@ -45,6 +46,7 @@ function App() {
     createPC,
     pcRef,
     setParticipants,
+    setRemoteMuted
   });
 
   // Join room
@@ -94,8 +96,18 @@ function App() {
   );
 
   useEffect(() => {
-  console.log("👥 Participants updated:", participants);
-}, [participants]);
+    console.log("👥 Participants updated:", participants);
+  }, [participants]);
+
+  const handleToggleMute = () => {
+    toggleMute();
+
+    socket.emit("mic-toggle", {
+      roomId,
+      muted: !isMuted
+    });
+  };
+
 
 
   return (
@@ -137,6 +149,12 @@ function App() {
               {remoteUser && (
                 <div className="name-tag">{remoteUser.username}</div>
               )}
+              {remoteMuted && (
+                <div className="mute-indicator">
+                  <BsFillMicMuteFill />
+                </div>
+              )}
+
             </div>
 
             {/* Local */}
@@ -148,13 +166,19 @@ function App() {
                 playsInline
                 className="video"
               />
+              {isMuted && (
+                <div className="mute-indicator">
+                  <BsFillMicMuteFill />
+                </div>
+              )}
+
               {localUser &&
                 <div className="name-tag you">{localUser.username} (You)</div>
               }
             </div>
           </div>
           <div className="controls">
-            <button onClick={toggleMute}>
+            <button onClick={handleToggleMute}>
               {isMuted ? <BsFillMicMuteFill /> : <BsFillMicFill />}
             </button>
 

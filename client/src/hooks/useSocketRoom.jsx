@@ -10,6 +10,7 @@ export function useSocketRoom({
   createPC,
   pcRef,
   setParticipants,
+  setRemoteMuted
 }) {
   useEffect(() => {
     if (!joined) return;
@@ -39,6 +40,11 @@ export function useSocketRoom({
 
       socket.emit("offer", { roomId, offer, username });
     };
+
+    const handleUserMic = async ({ username, muted }) => {
+      console.log("🎤 Remote mic:", username, muted);
+      setRemoteMuted(muted);
+    }
 
     const handleOffer = async ({ offer, username }) => {
       console.log("📨 Offer from:", username);
@@ -90,6 +96,7 @@ export function useSocketRoom({
     // ---- REGISTER LISTENERS ----
     socket.on("room-users", handleRoomUsers);
     socket.on("user-joined", handleUserJoined);
+    socket.on("remote-mic-toggle", handleUserMic);
     socket.on("offer", handleOffer);
     socket.on("answer", handleAnswer);
     socket.on("ice-candidate", handleIceCandidate);
@@ -99,6 +106,7 @@ export function useSocketRoom({
     return () => {
       socket.off("room-users", handleRoomUsers);
       socket.off("user-joined", handleUserJoined);
+      socket.off("remote-mic-toggle", handleUserMic);
       socket.off("offer", handleOffer);
       socket.off("answer", handleAnswer);
       socket.off("ice-candidate", handleIceCandidate);

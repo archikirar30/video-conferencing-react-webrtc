@@ -50,6 +50,15 @@ io.on("connection", (socket) => {
     });
   });
 
+  // ---------------- USER MIC STATS ----------------
+  socket.on("mic-toggle", ({ roomId, username, muted }) => {
+    socket.to(roomId).emit("remote-mic-toggle", {
+      username,
+      muted
+    });
+  });
+
+
   // ---------------- OFFER ----------------
   socket.on("offer", ({ roomId, offer, username }) => {
     socket.to(roomId).emit("offer", { offer, username });
