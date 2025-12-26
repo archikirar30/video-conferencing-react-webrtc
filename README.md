@@ -3,6 +3,9 @@
 PeerMeet is a real-time, peer-to-peer video conferencing web application built using **WebRTC**, **React**, and **Socket.IO**.  
 It enables users to join rooms, communicate via video/audio, see participant names, and manage mute/unmute and camera states — similar to Google Meet at a basic level.
 
+https://github.com/user-attachments/assets/02ffa21b-e2b7-401a-b99c-e03771bff3b4
+
+
 ---
 
 ## 🚀 Features
