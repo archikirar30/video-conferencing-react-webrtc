@@ -9,74 +9,105 @@ export function useSocketRoom({
   remoteVideoRef,
   createPC,
   pcRef,
-  setRemoteUserName
+  setParticipants,
 }) {
   useEffect(() => {
-  if (!joined) return;
+    if (!joined) return;
 
-  socket.emit("join-room", { roomId, username });
+    // ---- JOIN ROOM ----
+    socket.emit("join-room", { roomId, username });
 
-  // 🟢 Existing user
-  socket.on("user-joined", async ({ username }) => {
-    setRemoteUserName(prev => prev ?? username);
+    // ---- HANDLERS ----
 
-    const pc = createPC({
-      localStream: streamRef.current,
-      remoteVideoRef,
-      socket,
-      roomId
-    });
+    const handleRoomUsers = (users) => {
+      console.log("👥 Room users:", users);
+      setParticipants(users);
+    };
 
-    const offer = await pc.createOffer();
-    await pc.setLocalDescription(offer);
+    const handleUserJoined = async ({ id, username }) => {
+      console.log("➕ User joined:", username);
 
-    socket.emit("offer", { roomId, offer, username });
-  });
+      const pc = createPC({
+        localStream: streamRef.current,
+        remoteVideoRef,
+        socket,
+        roomId
+      });
 
-  // 🟢 New user
-  socket.on("offer", async ({ offer, username}) => {
-    setRemoteUserName(prev => prev ?? username);
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
 
-    const pc = createPC({
-      localStream: streamRef.current,
-      remoteVideoRef,
-      socket,
-      roomId
-    });
+      socket.emit("offer", { roomId, offer, username });
+    };
 
-    await pc.setRemoteDescription(offer);
+    const handleOffer = async ({ offer, username }) => {
+      console.log("📨 Offer from:", username);
 
-    const answer = await pc.createAnswer();
-    await pc.setLocalDescription(answer);
+      const pc = createPC({
+        localStream: streamRef.current,
+        remoteVideoRef,
+        socket,
+        roomId
+      });
 
-    socket.emit("answer", { roomId, answer, username });
-  });
+      await pc.setRemoteDescription(offer);
 
-  socket.on("answer", async ({ answer }) => {
-    await pcRef.current.setRemoteDescription(answer);
-  });
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
 
-  socket.on("ice-candidate", async (candidate) => {
-    if (!candidate) return;
-    await pcRef.current.addIceCandidate(candidate);
-  });
+      socket.emit("answer", { roomId, answer, username });
+    };
 
-  socket.on("user-left", () => {
-    setRemoteUserName(null);
+    const handleAnswer = async ({ answer }) => {
+      console.log("📨 Answer received");
+      if (!pcRef.current) return;
+      await pcRef.current.setRemoteDescription(answer);
+    };
 
-    if (remoteVideoRef.current) {
-      remoteVideoRef.current.srcObject = null;
-    }
+    const handleIceCandidate = async (candidate) => {
+      if (!candidate || !pcRef.current) return;
+      await pcRef.current.addIceCandidate(candidate);
+    };
 
-    if (pcRef.current) {
-      pcRef.current.close();
-      pcRef.current = null;
-    }
-  });
+    const handleUserLeft = ({ id, username }) => {
+      console.log("👋 User left:", username);
 
-  return () => {
-    socket.removeAllListeners();
-  };
-}, [joined]);
+      setParticipants(prev =>
+        prev.filter(user => user.id !== id)
+      );
 
+      if (remoteVideoRef.current) {
+        remoteVideoRef.current.pause();
+        remoteVideoRef.current.srcObject = null;
+      }
+
+      if (pcRef.current) {
+        pcRef.current.close();
+        pcRef.current = null;
+      }
+    };
+
+    // ---- REGISTER LISTENERS ----
+    socket.on("room-users", handleRoomUsers);
+    socket.on("user-joined", handleUserJoined);
+    socket.on("offer", handleOffer);
+    socket.on("answer", handleAnswer);
+    socket.on("ice-candidate", handleIceCandidate);
+    socket.on("user-left", handleUserLeft);
+
+    // ---- CLEANUP ----
+    return () => {
+      socket.off("room-users", handleRoomUsers);
+      socket.off("user-joined", handleUserJoined);
+      socket.off("offer", handleOffer);
+      socket.off("answer", handleAnswer);
+      socket.off("ice-candidate", handleIceCandidate);
+      socket.off("user-left", handleUserLeft);
+
+      if (pcRef.current) {
+        pcRef.current.close();
+        pcRef.current = null;
+      }
+    };
+  }, [joined, roomId, username]);
 }

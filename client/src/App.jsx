@@ -13,7 +13,8 @@ function App() {
   const [roomId, setRoomId] = useState("");
   const [joined, setJoined] = useState(false);
   const [username, setUserName] = useState("");
-  const [remoteUserName, setRemoteUserName] = useState(null)
+  const [participants, setParticipants] = useState([]);
+
 
   // Video refs
   const localVideoRef = useRef(null);
@@ -43,7 +44,7 @@ function App() {
     remoteVideoRef,
     createPC,
     pcRef,
-    setRemoteUserName,
+    setParticipants,
   });
 
   // Join room
@@ -67,7 +68,9 @@ function App() {
       remoteVideoRef.current.srcObject = null;
     }
 
-    setRemoteUserName(null); // 👈 THIS FIXES STUCK NAME
+    setUserName("")
+    setRoomId("")
+
     setJoined(false);
   };
 
@@ -80,6 +83,20 @@ function App() {
 
     localVideoRef.current.srcObject = streamRef.current;
   }, [joined]);
+
+  //Find User
+  const localUser = participants.find(
+    p => p.username === username
+  );
+
+  const remoteUser = participants.find(
+    p => p.username !== username
+  );
+
+  useEffect(() => {
+  console.log("👥 Participants updated:", participants);
+}, [participants]);
+
 
   return (
     <div className="app">
@@ -117,8 +134,8 @@ function App() {
                 playsInline
                 className="video"
               />
-              {remoteUserName && (
-                <div className="name-tag">{remoteUserName}</div>
+              {remoteUser && (
+                <div className="name-tag">{remoteUser.username}</div>
               )}
             </div>
 
@@ -131,7 +148,9 @@ function App() {
                 playsInline
                 className="video"
               />
-              <div className="name-tag you">{username} (You)</div>
+              {localUser &&
+                <div className="name-tag you">{localUser.username} (You)</div>
+              }
             </div>
           </div>
           <div className="controls">

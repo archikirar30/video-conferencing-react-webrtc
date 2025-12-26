@@ -15,81 +15,100 @@ const io = new Server(server, {
   }
 });
 
+// 🔑 Room state
 const rooms = {};
 
 io.on("connection", (socket) => {
+  console.log("🔌 Connected:", socket.id);
 
+  // ---------------- JOIN ROOM ----------------
   socket.on("join-room", ({ roomId, username }) => {
-    socket.data.username = username
-    socket.data.id = roomId
-    console.log(`User Data :${socket.data.username}`)
-    socket.join(roomId);
+    if (!roomId || !username) return;
 
-    // create room if not exists
+    socket.join(roomId);
+    socket.data.roomId = roomId;
+    socket.data.username = username;
+
     if (!rooms[roomId]) {
       rooms[roomId] = [];
     }
 
-    // Send existing users to new user
-    // 🔹 Send existing users to the new user
-    socket.emit("existing-users", rooms[roomId]);
-
-    // 🔹 Add current user
     rooms[roomId].push({
       id: socket.id,
       username
     });
 
+    console.log(`👥 ${username} joined ${roomId}`);
+
+    // Send full list to everyone
+    io.to(roomId).emit("room-users", rooms[roomId]);
+
+    // Notify others (not self)
     socket.to(roomId).emit("user-joined", {
       id: socket.id,
       username
     });
-
   });
 
+  // ---------------- OFFER ----------------
   socket.on("offer", ({ roomId, offer, username }) => {
-    console.log("📨 OFFER:", offer);
     socket.to(roomId).emit("offer", { offer, username });
   });
 
+  // ---------------- ANSWER ----------------
   socket.on("answer", ({ roomId, answer, username }) => {
-    console.log("📨 ANSWER:", answer);
-    console.log("Answer user-name", username)
-    socket.to(roomId).emit("answer", { roomId, answer, username });
+    socket.to(roomId).emit("answer", { answer, username });
   });
 
+  // ---------------- ICE ----------------
   socket.on("ice-candidate", ({ roomId, candidate }) => {
-    console.log("❄ ICE:", candidate);
+    if (!candidate) return;
     socket.to(roomId).emit("ice-candidate", candidate);
   });
 
-
-   socket.on("leave-room", ({ roomId }) => {
-    handleLeave(socket, roomId);
+  // ---------------- LEAVE ROOM ----------------
+  socket.on("leave-room", () => {
+    handleLeave(socket);
   });
 
+  // ---------------- DISCONNECT ----------------
   socket.on("disconnect", () => {
     console.log("❌ Disconnected:", socket.id);
-    // cannot rely on roomId here
+    handleLeave(socket);
   });
 });
 
-function handleLeave(socket, roomId) {
-  const username = socket.data?.username;
-
-  console.log("🚪 handleLeave called", roomId, username);
-
+// ---------------- LEAVE HANDLER ----------------
+function handleLeave(socket) {
+  const { roomId, username } = socket.data;
   if (!roomId) return;
 
+  console.log(`🚪 ${username} left ${roomId}`);
+
+  // Remove user from room state
+  rooms[roomId] = rooms[roomId]?.filter(
+    user => user.id !== socket.id
+  );
+
+  // Notify others
   socket.to(roomId).emit("user-left", {
     id: socket.id,
     username
   });
 
+  // Update user list
+  io.to(roomId).emit("room-users", rooms[roomId]);
+
   socket.leave(roomId);
+
+  // Cleanup empty room
+  if (rooms[roomId]?.length === 0) {
+    delete rooms[roomId];
+    console.log(`🧹 Deleted empty room ${roomId}`);
+  }
 }
 
-
+// ---------------- START SERVER ----------------
 server.listen(3000, () => {
-  console.log("Signaling server running on port 3000");
+  console.log("🚀 Signaling server running on port 3000");
 });
